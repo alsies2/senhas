@@ -1,0 +1,247 @@
+
+import hashlib
+import os
+import secrets
+import string
+import time
+import hmac
+import itertools
+import getpass
+
+# ==========================================
+# CONFIGURAÇÕES VISUAIS
+# ==========================================
+
+VERDE = "\033[92m"
+AZUL = "\033[94m"
+AMARELO = "\033[93m"
+VERMELHO = "\033[91m"
+CIANO = "\033[96m"
+RESET = "\033[0m"
+NEGRITO = "\033[1m"
+
+
+def limpar_tela():
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def titulo():
+    print(CIANO + "=" * 55)
+    print("          SISTEMA DE LOGIN E HASH")
+    print("=" * 55 + RESET)
+
+
+# ==========================================
+# FUNÇÃO DE HASH
+# ==========================================
+
+def calcula_hash(senha, salt):
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        senha.encode(),
+        salt,
+        200000
+    )
+
+
+# ==========================================
+# BANCO DE USUÁRIOS
+# ==========================================
+
+usuarios = {}
+
+
+def cadastrar_usuario():
+    print("\n" + AZUL + "--- CADASTRO DE USUÁRIO ---" + RESET)
+
+    nome = input("Nome de usuário: ").strip()
+
+    if not nome or nome in usuarios:
+        print(VERMELHO + "Usuário inválido ou já cadastrado!" + RESET)
+        return
+
+    senha = getpass.getpass("Digite sua senha: ")
+
+    if not senha:
+        print(VERMELHO + "A senha não pode estar vazia!" + RESET)
+        return
+
+    salt = secrets.token_bytes(16)
+
+    senha_hash = calcula_hash(senha, salt)
+
+    usuarios[nome] = {
+        "salt": salt,
+        "hash": senha_hash
+    }
+
+    print(VERDE + "\nUsuário cadastrado com sucesso!" + RESET)
+
+
+# ==========================================
+# SISTEMA DE LOGIN
+# ==========================================
+
+def realizar_login():
+
+    print("\n" + AZUL + "--- AUTENTICAÇÃO ---" + RESET)
+
+    nome = input("Usuário: ").strip()
+    senha = getpass.getpass("Senha: ")
+
+    if nome not in usuarios:
+        print(VERMELHO + "\nUsuário não encontrado!" + RESET)
+        return
+
+    dados = usuarios[nome]
+
+    hash_digitado = calcula_hash(
+        senha,
+        dados["salt"]
+    )
+
+    if hmac.compare_digest(hash_digitado, dados["hash"]):
+        print(VERDE + "\nLOGIN REALIZADO COM SUCESSO!" + RESET)
+    else:
+        print(VERMELHO + "\nSenha incorreta!" + RESET)
+
+
+# ==========================================
+# GERADOR DE COMBINAÇÕES E HASHES
+# ==========================================
+
+def gerar_combinacoes():
+
+    print("\n" + AZUL + "--- GERADOR DE HASHES ---" + RESET)
+
+    caracteres = input(
+        "Caracteres permitidos (ex: abc123): "
+    )
+
+    if not caracteres:
+        print(VERMELHO + "Informe os caracteres!" + RESET)
+        return
+
+    if len(set(caracteres)) != len(caracteres):
+        print(VERMELHO + "Não repita caracteres!" + RESET)
+        return
+
+    tamanho = input("Tamanho das combinações (1 a 3): ")
+
+    if tamanho not in ("1", "2", "3"):
+        print(VERMELHO + "Tamanho inválido!" + RESET)
+        return
+
+    tamanho = int(tamanho)
+
+    total = len(caracteres) ** tamanho
+
+    # Salt exclusivo para a demonstração
+    salt_demo = b"demonstracao_local"
+
+    print("\n" + CIANO + "INICIANDO PROCESSAMENTO..." + RESET)
+    print(f"Total de combinações: {total}")
+    print("-" * 55)
+
+    inicio = time.time()
+    processadas = 0
+
+    for combinacao in itertools.product(
+        caracteres,
+        repeat=tamanho
+    ):
+
+        senha = "".join(combinacao)
+
+        # Calcula o hash de cada combinação
+        resultado = calcula_hash(senha, salt_demo)
+
+        processadas += 1
+
+        # Barra de progresso
+        progresso = processadas / total
+        barra = int(progresso * 30)
+
+        visual = (
+            "[" +
+            "#" * barra +
+            "-" * (30 - barra) +
+            "]"
+        )
+
+        porcentagem = progresso * 100
+
+        print(
+            f"\r{VERDE}{visual}{RESET} "
+            f"{porcentagem:6.2f}% "
+            f"| {processadas}/{total} "
+            f"| Atual: {senha}",
+            end="",
+            flush=True
+        )
+
+        # O resultado é calculado, mas não é
+        # comparado com credenciais de usuários.
+        _ = resultado
+
+    fim = time.time()
+
+    print("\n\n" + VERDE + "PROCESSAMENTO CONCLUÍDO!" + RESET)
+    print("-" * 55)
+    print(f"Combinações processadas: {processadas}")
+    print(f"Tempo total: {fim - inicio:.2f} segundos")
+    print("-" * 55)
+
+
+# ==========================================
+# MENU PRINCIPAL
+# ==========================================
+
+def menu():
+
+    while True:
+
+        limpar_tela()
+        titulo()
+
+        print("""
+        [1] Cadastrar usuário
+        [2] Realizar login
+        [3] Gerar combinações e calcular hashes
+        [4] Listar usuários cadastrados
+        [0] Sair
+        """)
+
+        opcao = input("Escolha uma opção: ")
+
+        if opcao == "1":
+            cadastrar_usuario()
+
+        elif opcao == "2":
+            realizar_login()
+
+        elif opcao == "3":
+            gerar_combinacoes()
+
+        elif opcao == "4":
+            print("\nUSUÁRIOS CADASTRADOS:")
+
+            if usuarios:
+                for nome in usuarios:
+                    print(VERDE + f"- {nome}" + RESET)
+            else:
+                print(AMARELO + "Nenhum usuário cadastrado." + RESET)
+
+        elif opcao == "0":
+            print(VERDE + "\nEncerrando o programa..." + RESET)
+            break
+
+        else:
+            print(VERMELHO + "\nOpção inválida!" + RESET)
+
+        input("\nPressione ENTER para continuar...")
+
+
+# EXECUÇÃO
+if __name__ == "__main__":
+    menu()
